@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String   @unique
+  password  String?
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspaceMembers WorkspaceMember[]
+  meetings         Meeting[]
+  assignedActions  ActionItem[]      @relation("AssignedTo")
+  createdActions   ActionItem[]      @relation("CreatedBy")
+  notifications    Notification[]
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members      WorkspaceMember[]
+  meetings     Meeting[]
+  subscription Subscription?
+}
+
+model WorkspaceMember {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        Role     @default(MEMBER)
+  joinedAt    DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+model Meeting {
+  id          String        @id @default(cuid())
+  workspaceId String
+  createdById String
+  title       String
+  description String?
+  audioUrl    String?
+  audioKey    String?
+  duration    Int?
+  status      MeetingStatus @default(PENDING)
+  meetingDate DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User         @relation(fields: [createdById], references: [id])
+  transcript  Transcript?
+  summary     Summary?
+  actionItems ActionItem[]
+}
+
+model Transcript {
+  id        String   @id @default(cuid())
+  meetingId String   @unique
+  content   String
+  createdAt DateTime @default(now())
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+}
+
+model Summary {
+  id        String   @id @default(cuid())
+  meetingId String   @unique
+  overview  String
+  keyPoints Json
+  decisions Json
+  nextSteps Json
+  sentiment String?
+  createdAt DateTime @default(now())
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+}
+
+model ActionItem {
+  id           String           @id @default(cuid())
+  meetingId    String
+  createdById  String
+  assignedToId String?
+  title        String
+  description  String?
+  dueDate      DateTime?
+  priority     Priority         @default(MEDIUM)
+  status       ActionItemStatus @default(TODO)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  meeting    Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  createdBy  User    @relation("CreatedBy", fields: [createdById], references: [id])
+  assignedTo User?   @relation("AssignedTo", fields: [assignedToId], references: [id])
+}
+
+model Subscription {
+  id            String             @id @default(cuid())
+  workspaceId   String             @unique
+  plan          Plan               @default(FREE)
+  status        SubscriptionStatus @default(ACTIVE)
+  meetingsUsed  Int                @default(0)
+  meetingsLimit Int                @default(3)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  read      Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum MeetingStatus {
+  PENDING
+  UPLOADING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ActionItemStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Plan {
+  FREE
+  PRO
+  TEAM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
